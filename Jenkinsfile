@@ -70,5 +70,37 @@ pipeline {
                 }
             }
         }
+
+        stage("Deploy to AWS") {
+            agent {
+                docker { 
+                    image 'amazon/aws-cli' 
+                    reuseNode true
+                    //args '--entrypoint=""'
+
+                    // login as root, so that we could install jq
+                     args '-u root --entrypoint=""'
+                }
+            }
+
+
+            steps {
+
+                withCredentials([usernamePassword(credentialsId: 'finalProjectUser', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+                // some block
+                sh '''
+                    aws --version
+
+                   # aws ecs register-task-definition --cli-input-json file://aws/task-definition.json
+                    yum install jq -y
+                    LATEST_TD_REVISION=$(aws ecs register-task-definition --cli-input-json file://aws/task-definition.json | jq '.taskDefinition.revision')
+
+                    # aws ecs update-service --cluster my-react-cluster-03252025 --service Temp-TaskDefinition-Prod-Service
+                    aws ecs update-service --cluster our-final-project-04082025 --service FinalProject-TaskDefinition-Prod-Service  --task-definition FinalProject-TaskDefinition-Prod:$LATEST_TD_REVISION
+
+                '''
+                }
+            }
+        }
     }
 }
